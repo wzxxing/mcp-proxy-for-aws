@@ -36,10 +36,13 @@ from mcp import McpError
 from mcp.types import (
     CONNECTION_CLOSED,
     ErrorData,
+    Implementation,
+    InitializeRequest,
     JSONRPCError,
     JSONRPCMessage,
     JSONRPCResponse,
 )
+from mcp_proxy_for_aws import __version__
 from mcp_proxy_for_aws.cli import parse_args
 from mcp_proxy_for_aws.logging_config import configure_logging
 from mcp_proxy_for_aws.middleware.tool_filter import ToolFilteringMiddleware
@@ -48,9 +51,13 @@ from mcp_proxy_for_aws.utils import (
     determine_aws_region,
     determine_service_name,
 )
+from pydantic import ValidationError
 
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_CLIENT_INFO = Implementation(name='mcp-proxy-for-aws', version=__version__)
 
 
 @contextlib.asynccontextmanager
@@ -58,7 +65,16 @@ async def _initialize_client(transport: ClientTransport):
     """Handle the exceptions for during client initialize."""
     async with contextlib.AsyncExitStack() as stack:
         try:
-            client = await stack.enter_async_context(Client(transport))
+            client_info: Implementation | None = None
+            if first_line := sys.stdin.readline():
+                with contextlib.suppress(ValidationError):
+                    init_request = InitializeRequest.model_validate_json(first_line, by_alias=True)
+                    client_info = init_request.params.clientInfo
+                    client_info.name = f'{client_info.name} via {DEFAULT_CLIENT_INFO.name}@{DEFAULT_CLIENT_INFO.version}'
+                    logger.debug('Using client info %s', client_info)
+            client = await stack.enter_async_context(
+                Client(transport, client_info=client_info or DEFAULT_CLIENT_INFO)
+            )
             if client.initialize_result:
                 print(
                     client.initialize_result.model_dump_json(
