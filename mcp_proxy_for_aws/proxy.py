@@ -130,7 +130,7 @@ class AWSMCPProxyClientFactory:
     def __init__(self, transport: ClientTransport) -> None:
         """Initialize a client factory with transport."""
         self._transport = transport
-        self._client = AWSMCPProxyClient(transport)
+        self._client: AWSMCPProxyClient | None = None
         self._clients: list[AWSMCPProxyClient] = []
         self._initialize_request: InitializeRequest | None = None
 
@@ -140,8 +140,9 @@ class AWSMCPProxyClientFactory:
 
     async def get_client(self) -> Client:
         """Get client."""
-        if not self._client.is_connected():
+        if self._client is None or not self._client.is_connected():
             self._client = AWSMCPProxyClient(self._transport)
+            self._clients.append(self._client)
 
         return self._client
 
