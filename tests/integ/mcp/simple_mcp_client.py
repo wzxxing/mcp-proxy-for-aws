@@ -89,6 +89,8 @@ def _build_args(endpoint: str, region_name: str, metadata: Optional[Dict[str, st
         'DEBUG',
         '--region',
         region_name,
+        '--profile',
+        'github-integ',
     ]
 
     # Add metadata arguments if provided
